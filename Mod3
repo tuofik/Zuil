@@ -1,0 +1,156 @@
+import psycopg2
+import tkinter as tk
+import requests
+from tkinter import *
+import datetime
+import json
+import random
+from tkinter import PhotoImage
+
+def connectie_database():
+    data = psycopg2.connect(   # Mijn connectie.
+        host='20.58.44.222',   # IP van mijn Azure virtual server
+        dbname='Stationszuil', # Naam van mijn database.
+        user='postgres',
+        port='5432',  # De poort.
+        password='passwordpony22' # Pass.
+    )
+    return data
+    cursor = data.cursor()
+    cursor.execute("select berichten.bericht, berichten.naam from berichten inner join beoordeling on berichten.berichtid = beoordeling.berichtid where beoordeling.status = True and order by berichten.datum desc limit 5")
+    laatste_berichten = cursor.fetchall()
+    cursor.close()
+    cursor.execute('''select * from beoordeling where status = true order by datum desc limit 5''')
+    cursor.close()
+    data.close()
+
+def stations():
+    with open('stations.txt', 'r') as document:
+        stations = document.read().splitlines()
+    chosen_station = random.choice(stations)
+
+def faci_teiten(data, chosen_station):
+    with data.cursor() as cursor:
+        try:
+            cursor.execute(f"select elevator, ov_bike, toilet, park_and_ride from station_city where station_city = %s", (chosen_station,))
+            facilities = cursor.fetchone()
+            if facilities:
+                elevator, ov_bike, toilet, park_and_ride = facilities
+                facilities_info = f"Elevator: {elevator}\nOV Bike: {ov_bike}\nToilet: {toilet}\nPark and Ride: {park_and_ride}"
+            else:
+                facilities_info = "Geen beschikbare faciliteiten gevonden op uw station."
+        except Exception:
+            print('Error bij het ophalen van gegevens.')
+        return facilities_info
+        #weer = data['weather'][0]
+def openweathermap(chosen_station):
+    API = 'ad4f9a50a9e7ee1b43a7b3552c979c96' # Dit is mijn API sleutel die mijn eigen weather-client genereert.
+    basis = 'https://api.openweathermap.org/data/2.5/weather?' # Elke openweather API bevat deze basis.
+    link = basis + f"q={chosen_station}&appid={API}" # Dit is de 'formule' die ervoor zorgt dat de data van een plaats wordt opgenomen.
+
+    response = requests.get(link)
+
+    data = response.json()
+    if 'main' in data:
+        main_data = data['main']
+        temp = main_data['temp'] - 273.15 # Dit is berekend in hoeveel graden Kelvin het is, min 273.15 converteert het naar Celsius.
+        vochtig = main_data['humidity'] # Humidity staat voor vochtigheid in de API.
+        return f"Temperatuur: {temp}\nVochtigheid: {vochtig}%" # Dit geeft een return message terug, de accolades krijgen actuele waarden.
+
+def vijf_berichten(data, chosen_station):
+    with data.cursor() as cursor:
+        cursor.execute(
+            "select berichten.bericht, berichten.naam from berichten inner join beoordeling on berichten.berichtid = beoordeling.berichtid where beoordeling.status = true and station = %s order by berichten.datum desc limit 5",
+            [chosen_station])
+        berichten = cursor.fetchall() # Kijkt door alles heen.
+        return berichten
+
+
+def main():
+    data = connectie_database() # Verbindt weer met de database.
+    with open('stations.txt', 'r') as document: # Leest de stations die ik heb gekozen
+        stations = document.read().splitlines()
+    chosen_station = random.choice(stations) # Randomiseert een station.
+    cursor = data.cursor()
+    cursor.execute(
+        f"select naam, bericht from berichten where station = '{chosen_station}' order by datum desc limit 5")
+    cursor.execute(
+        f"select elevator, ov_bike, toilet, park_and_ride from station_service where station_city = '{chosen_station}'")
+# De select statements kijken naar de faciliteiten per station, en selecten de 5 meest recente berichten.
+    stationshal = Tk() # Tkinter wordt nu gebruikt.
+    stationshal.geometry("400x200") # De grootte van het scherm.
+    stationshal.config(bg="yellow") # De achtergrond van het scherm.
+    stationshal.title("Welkom bij de stationshal!") # De titel van het scherm.
+    def openNewWindow():
+        source_path = "C:\\Users\\Hp\\Downloads\\weerbericht.png"
+        weerbericht_tekst = Toplevel(stationshal)  # Dit zal geopend worden over de stationshal scherm heen.
+        weerbericht_tekst.title("Het Weerbericht") # Dit is de titel van het weerbericht scherm.
+        weerbericht_tekst.geometry("400x300") # De grootte van het weerbericht scherm.
+        weerbericht_tekst.config(bg="yellow") # De achtergrond van het weerbericht scherm.
+        image= PhotoImage(file="C:\\Users\\Hp\Downloads\\weerbericht.png")
+        apeldoorn_weer = openweathermap("Apeldoorn") # Hier genereer ik het weer voor het eerste station.
+        lelystad_weer = openweathermap("Lelystad") # Hier genereer ik het weer voor het tweede station.
+        leeuwarden_weer = openweathermap("Leeuwarden") # Hier genereer ik het weer voor het derde station.
+
+        weerbericht_label = Label(weerbericht_tekst, text=f"Het weer in Apeldoorn:\n{apeldoorn_weer}\n\nHet weer in Lelystad:\nfloat({lelystad_weer})\n\nHet weer in Leeuwarden:\n{leeuwarden_weer}", font=('Calibri', 12))
+        # Dit laat het weer zien in de weerbericht scherm.
+        weerbericht_label.pack(pady=10)
+        weerbericht_label.config(bg="Yellow")
+
+
+    def NewWindow2():
+        faciliteiten_tekst = Toplevel(stationshal) # Het scherm zal verschijnen boven het stationshal scherm heen.
+        faciliteiten_tekst.title('Beschikbare Faciliteiten') # De titel.
+        faciliteiten_tekst.geometry("300x300") # De grootte.
+        faciliteiten_tekst.config(bg="yellow") # De kleur van de achtergrond.
+
+        faciliteiten_label = Label(faciliteiten_tekst, text=f"Faciliteiten in Appeldoorn:\nStation Appeldoorn heeft geen ov-bike.\nStation Appeldoorn heeft een lift.\nStation Appeldoorn heeft geen toilet.\nStation Appeldoorn heeft een park and ride.\n\nFaciliteiten in Lelystad:\nStation Lelystad heeft een ov-bike.\nStation Lelystad heeft een lift.\nStation Lelystad heeft geen toilet.\nStation Lelystad heeft een park and ride.\n\nFaciliteiten in Leeuwarden:\nStation Leeuwarden heeft ov-bike.\nStation Leeuwarden heeft geen lift.\nStation Leeuwarden heeft een toilet.\nStation Leeuwarden heeft geen park and ride.")
+        faciliteiten_label.pack(pady=10)
+        faciliteiten_label.config(bg="Blue")
+
+    def NewWindow3():
+        vijf_laatste = Toplevel(stationshal) # Ook dit scherm verschijnd boven het stationshal scherm.
+        vijf_laatste.title("Berichten en reviews") # De titel van de window.
+        vijf_laatste.geometry("600x200") # De grootte van de window.
+
+        bericht_frame = Frame(vijf_laatste, bg="Yellow") # Dit is de frame waar ik de berichten in plaats.
+        bericht_frame.pack(side=LEFT, fill=Y, expand=YES) # Alles wordt hierdoor gepushed naar de linker kant van het scherm.
+        bericht_ui = Listbox(bericht_frame, width=120, height=20) # Dit is de grootte van het frame.
+        bericht_ui.pack(side=LEFT, fill=BOTH, expand=YES)  # Wordt ook gepushed naar de linkerkant.
+
+        cursor.execute("select datum, station, naam, bericht from berichten limit 5")
+        recente_berichten = cursor.fetchall()
+
+        berichten_label = Label(bericht_frame, text="De meest recente ontvangen berichten:")
+        berichten_label.pack()
+
+        for bericht in recente_berichten:
+            bericht_tekst = bericht[0]
+            datum, station, bericht_boodschap, bericht_verstuurder = bericht # De variabelen staan gelijk aan bericht.
+            bericht_geheel = f"{datum} - {station} - {bericht_boodschap}: {bericht_verstuurder}" # Dit is hoe het bericht vertoond zal worden op de GUI.
+            bericht_ui.insert(END, bericht_geheel)
+            bericht_label = Label(vijf_laatste, text=bericht_tekst) # Vijf laatste berichten worden getoond met de content van bericht_tekst.
+            bericht_label.pack()
+        cursor.close()
+
+
+# Hieronder staan de buttons die elk een nieuw window openen, met elk een nieuwe functie zoals weer, faciliteiten en berichten.
+    actie1 = Button(stationshal,
+                    text="Klik hier voor het weerbericht in uw regio.",
+                    command=openNewWindow)
+    actie1.pack(pady=10)
+
+    actie2 = Button(stationshal,
+                    text="Klik hier voor de faciliteiten op uw station.",
+                    command=NewWindow2)
+    actie2.pack(pady=10)
+
+    actie3 = Button(stationshal,
+                    text="Klik hier voor de reviews.",
+                    command=NewWindow3)
+    actie3.pack(pady=10)
+
+    stationshal.mainloop()
+
+if __name__=='__main__':
+    main()
