@@ -1,0 +1,40 @@
+import datetime
+import random
+
+
+def vraagnaam(): # Met deze functie wordt een invuller gevraagd om een naam
+    naam = input('Laat hier uw naam achter (optioneel): ').strip()
+    if not naam:
+        if len(naam) == 0: # ==0 geeft aan als er niks ingevuld wordt
+            naam = 'Anoniem' # Als ze niks invullen (wat mag), zullen zij als 'anoniem' geaccepteerd worden
+    return naam
+
+
+def datum(): # Deze functie is voor het ophalen van de datum.
+    return datetime
+
+
+def randomized_station(): # Met behulp van deze functie wordt er een station willekeurig gekoppeld aan een persoon
+    with open('stations.txt', 'r') as stations_beschikbaar: # Hier wordt het tekstdocument, 'stations.txt' gelezen.
+        stations = stations_beschikbaar.read().splitlines() # Stations staat gelijk aan ''stations_beschikbaar'' hierdoor.
+        return random.choice(stations) # Uit alle stations wordt er nu een willekeurig station getrokken
+
+
+if __name__ == "__main__":
+    while True: # Een loop.
+        beoordeling = input('Laat hier een bericht achter: \n').strip() # Men mag hier een bericht invoeren.
+
+        if len(beoordeling) > 140: # Dit geeft aan dat als de lengte van een geschreven boven de 140 karakters uitkomt, er een error code zal geprint worden.
+            print('U overschrijdt het aantal maximum karakters van 140, gelieve uw feedback in te korten.')
+            continue
+        elif len(beoordeling) == 0: # == 0 staat gelijk aan NIKS. Als iemand niks invult, zal er nog een error geprint worden ter informatie van de vrijwilliger.
+            print('U heeft niks ingevuld, gelieve dit opnieuw te proberen!')
+        else:
+            naam = vraagnaam()
+            tijd = datetime.datetime.now().strftime('%Y-%m-%d %H-%M-%S')
+            station = randomized_station()
+
+            with open('berichten.csv', 'a') as ontvangen_berichten: # Hier wordt de data opgeslagen en toegevoegd aan 'berichten.csv'.
+                ontvangen_berichten.write(f'{tijd}, {naam}, {station}, {beoordeling}\n') # Hier wordt de volgorde van kolommen geformateerd.
+                print('Uw antwoord is opgeslagen en opgestuurd, dank voor uw participatie!')
+                break
